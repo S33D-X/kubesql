@@ -9,7 +9,7 @@ pip install -e .
 
 Basic Usage
 ```bash
-kubesql "SELECT * from pods WHERE namespace = 'kube-system'"
+kubesql "SELECT * from pods WHERE namespace = 'kube-system'" > pods.csv
 ```
 
 Basic query
