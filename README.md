@@ -3,17 +3,17 @@ Query kubernetes clusters using SQL
 
 ## Usage
 Install locally
-```
+```bash
 pip install -e .
 ```
 
 Basic Usage
-```
-kubesql SELECT * from pods WHERE namespace = 'kube-system' > pods.csv
+```bash
+kubesql "SELECT * from pods WHERE namespace = 'kube-system'"
 ```
 
 Basic query
-```
+```sql
 SELECT * from pods WHERE namespace = 'kube-system'
 ```
 
