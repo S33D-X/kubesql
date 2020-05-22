@@ -8,15 +8,14 @@ import sys
 import pyparsing
 import pandas as pd
 from io import StringIO
+import kubesql.cell_processing as cp
+from kubesql.kubesql_exception import KubeSqlException
 
 
 def main():
     try:
-        sql = " ".join(sys.argv[1:])
-        result = query_kubernetes(sql)
-
-        # get results as DataFrame
-        result_df = pd.DataFrame(result)
+        args = parse_args()
+        result_df = query_kubernetes(args['sql'])
 
         # convert to csv
         fp = StringIO()
@@ -32,6 +31,10 @@ def main():
         print(str(f"SQL ERROR: {e}"))
 
 
+def parse_args():
+    sql = " ".join(sys.argv[1:])
+    return {'sql': sql}
+
 
 def query_kubernetes(sql):
     # sql = "select * from nodes where namespace = 'kubeflow'"
@@ -39,7 +42,7 @@ def query_kubernetes(sql):
     # parse query
     parsed_query = parse_query(sql)
 
-    # print(json.dumps(parsed_query)) # indent=4, separators=(',', ': ')
+    print(json.dumps(parsed_query, indent=4, separators=(',', ': ')))
 
     # get results from kubectl
     kubectl_result = get_kubectl_result(parsed_query)
@@ -47,7 +50,14 @@ def query_kubernetes(sql):
     # select columns
     results_selected_columns = select_columns(kubectl_result, parsed_query)
 
-    return results_selected_columns
+    if parsed_query['query'].get('limit'):
+        limit = parsed_query['query']['limit']
+        results_selected_columns = results_selected_columns[:limit]
+
+    # get results as DataFrame
+    result_df = pd.DataFrame(results_selected_columns)
+
+    return result_df
 
 
 def parse_query(sql):
@@ -97,36 +107,10 @@ def process_row(row, columns):
 
     for col in columns:
         column_name = col["name"]
-        column_content = process_cell(row.get(col["column"], None), col["func"], col["column"])
+        column_content = cp.process_cell(row.get(col["column"], None), col["func"], col["column"])
         final_row[column_name] = column_content
 
     return final_row
-
-
-def process_cell(data, func, col_name):
-    functions = {
-        "cell": process_cell_cell,
-        "str": process_cell_str
-    }
-
-    if func not in functions.keys():
-        raise KubeSqlException(f"Unknow function '{func}' for column '{col_name}'")
-
-    return functions[func](data)
-
-
-def process_cell_cell(data):
-    if isinstance(data, dict):
-        formatted_cell = "<dict>"
-    elif isinstance(data, list):
-        formatted_cell = "<list>"
-    else:
-        formatted_cell = str(data)
-    return formatted_cell
-
-
-def process_cell_str(data):
-    return str(data)
 
 
 def get_column_names(result, query):
@@ -188,7 +172,4 @@ def parse_value(value):
     else:
         return str(value)
 
-
-class KubeSqlException(Exception):
-    pass
 
